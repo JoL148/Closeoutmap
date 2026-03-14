@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CloseoutMap — Find Liquidation Sales Near You</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+:root{--ink:#0A0A0B;--panel:#131316;--card:#1C1C21;--edge:#2A2A32;--muted:#6B6B7A;--soft:#9494A3;--text:#EEEEF2;--fire:#FF3B1F;--ember:#FF6B35;--gold:#FFB020;--jade:#22C55E;--radius:10px;--sidebar:340px;--header:56px}
+html,body{height:100%;overflow:hidden}
+body{font-family:'Syne',sans-serif;background:var(--ink);color:var(--text);display:flex;flex-direction:column}
+#header{height:var(--header);background:var(--panel);border-bottom:1px solid var(--edge);display:flex;align-items:center;padding:0 16px;gap:12px;flex-shrink:0;z-index:1000}
+.logo{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:3px;color:var(--text);display:flex;align-items:center;gap:7px;white-space:nowrap;flex-shrink:0}
+.logo-pulse{width:8px;height:8px;background:var(--fire);border-radius:50%;animation:livepulse 2s ease-in-out infinite}
+@keyframes livepulse{0%{box-shadow:0 0 0 0 rgba(255,59,31,0.5)}70%{box-shadow:0 0 0 8px rgba(255,59,31,0)}100%{box-shadow:0 0 0 0 rgba(255,59,31,0)}}
+.header-search{flex:1;max-width:320px;position:relative;min-width:0}
+.header-search input{width:100%;background:var(--card);border:1px solid var(--edge);border-radius:var(--radius);padding:7px 12px 7px 34px;color:var(--text);font-family:'Syne',sans-serif;font-size:13px;outline:none;transition:border-color 0.2s}
+.header-search input:focus{border-color:var(--ember)}
+.header-search input::placeholder{color:var(--muted)}
+.search-icon{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:13px;pointer-events:none}
+.header-filters{display:flex;gap:5px;flex:1;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.header-filters::-webkit-scrollbar{display:none}
+.chip{padding:5px 11px;border-radius:100px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;border:1px solid var(--edge);color:var(--muted);background:transparent;transition:all 0.18s;flex-shrink:0}
+.chip:hover{border-color:var(--soft);color:var(--text)}
+.chip.on{background:var(--fire);border-color:var(--fire);color:white}
+.btn-alert-header{background:linear-gradient(135deg,var(--fire),var(--ember));color:white;border:none;padding:7px 14px;border-radius:var(--radius);font-family:'Syne',sans-serif;font-weight:700;font-size:12px;cursor:pointer;white-space:nowrap;flex-shrink:0;transition:opacity 0.2s}
+.btn-alert-header:hover{opacity:0.88}
+#mobile-bar{display:none;background:var(--panel);border-bottom:1px solid var(--edge);padding:8px 14px;flex-shrink:0}
+#main{flex:1;display:grid;grid-template-columns:var(--sidebar) 1fr;overflow:hidden;position:relative}
+#sidebar{background:var(--panel);border-right:1px solid var(--edge);display:flex;flex-direction:column;overflow:hidden;transition:transform 0.3s ease}
+.sidebar-top{padding:12px 14px 10px;border-bottom:1px solid var(--edge);flex-shrink:0}
+.sidebar-count{font-size:11px;font-weight:700;letter-spacing:2px;color:var(--muted);text-transform:uppercase;margin-bottom:1px}
+.sidebar-subtitle{font-size:11px;color:var(--muted)}
+#store-list{flex:1;overflow-y:auto;padding:8px 8px 16px}
+#store-list::-webkit-scrollbar{width:3px}
+#store-list::-webkit-scrollbar-thumb{background:var(--edge);border-radius:2px}
+.scard{background:var(--card);border:1px solid var(--edge);border-left:3px solid transparent;border-radius:var(--radius);padding:12px 13px;margin-bottom:6px;cursor:pointer;transition:all 0.18s;animation:fadeUp 0.3s ease both}
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.scard:hover{border-left-color:var(--ember);background:#202026}
+.scard-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:6px}
+.scard-name{font-size:13px;font-weight:700;color:var(--text);line-height:1.25}
+.scard-loc{font-size:11px;color:var(--muted);margin-top:2px}
+.disc{font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:1px;line-height:1;flex-shrink:0}
+.scard-meta{display:flex;gap:8px;font-size:11px;color:var(--muted);align-items:center;flex-wrap:wrap}
+.status-pip{width:5px;height:5px;border-radius:50%;flex-shrink:0;display:inline-block}
+.scard-note{font-size:10px;color:#FF8C42;margin-top:5px;font-weight:600;border-top:1px solid var(--edge);padding-top:5px;line-height:1.4}
+#map{flex:1;z-index:1}
+.leaflet-tile{filter:brightness(0.45) saturate(0.3) hue-rotate(200deg)}
+.leaflet-container{background:#0d0d14}
+.cm-marker{display:flex;flex-direction:column;align-items:center;cursor:pointer}
+.cm-pin{width:42px;height:42px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(0,0,0,0.6);border:2px solid rgba(255,255,255,0.15)}
+.cm-pin-text{transform:rotate(45deg);font-family:'Bebas Neue',sans-serif;font-size:12px;color:white;line-height:1;text-align:center}
+.cm-shadow{width:10px;height:4px;background:rgba(0,0,0,0.35);border-radius:50%;margin-top:3px}
+.leaflet-popup-content-wrapper{background:var(--card)!important;border:1px solid var(--edge)!important;border-radius:14px!important;box-shadow:0 20px 60px rgba(0,0,0,0.8)!important;padding:0!important}
+.leaflet-popup-tip{background:var(--card)!important}
+.leaflet-popup-content{margin:0!important;width:300px!important}
+.leaflet-popup-close-button{color:var(--muted)!important;font-size:18px!important;top:10px!important;right:12px!important}
+.popup-inner{padding:16px 16px 14px}
+.popup-chain{font-size:10px;font-weight:700;letter-spacing:2.5px;color:var(--muted);text-transform:uppercase;margin-bottom:3px}
+.popup-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px}
+.popup-name{font-size:15px;font-weight:800;color:var(--text);line-height:1.2}
+.popup-disc{font-family:'Bebas Neue',sans-serif;font-size:34px;line-height:1}
+.popup-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:12px}
+.popup-cell{background:var(--panel);border-radius:8px;padding:8px 10px}
+.popup-cell-label{font-size:9px;font-weight:700;letter-spacing:2px;color:var(--muted);text-transform:uppercase;margin-bottom:2px}
+.popup-cell-val{font-size:12px;font-weight:700;color:var(--text)}
+.popup-note{background:rgba(255,107,53,0.12);border:1px solid rgba(255,107,53,0.35);border-radius:8px;padding:8px 10px;margin-bottom:12px;font-size:11px;color:#FF6B35;line-height:1.5;font-weight:600}
+.popup-note-label{font-size:9px;font-weight:700;letter-spacing:2px;color:#FF6B35;text-transform:uppercase;margin-bottom:3px}
+.timeline-section{margin-bottom:12px}
+.timeline-title{font-size:10px;font-weight:700;letter-spacing:2px;color:var(--muted);text-transform:uppercase;margin-bottom:7px}
+.timeline-row{display:flex;align-items:center;gap:7px;margin-bottom:4px}
+.timeline-week{font-size:10px;color:var(--muted);width:48px;flex-shrink:0}
+.timeline-bar-wrap{flex:1;height:5px;background:var(--edge);border-radius:3px;overflow:hidden}
+.timeline-bar-fill{height:100%;border-radius:3px}
+.timeline-pct{font-size:10px;font-weight:700;width:36px;text-align:right;flex-shrink:0}
+.timeline-here{font-size:9px;background:var(--fire);color:white;padding:1px 5px;border-radius:3px;font-weight:700}
+.popup-actions{display:flex;gap:6px}
+.popup-btn-dir{flex:1;background:var(--fire);color:white;border:none;border-radius:8px;padding:9px;font-family:'Syne',sans-serif;font-weight:700;font-size:12px;cursor:pointer}
+.popup-btn-src{background:var(--panel);color:var(--soft);border:1px solid var(--edge);border-radius:8px;padding:9px 11px;font-family:'Syne',sans-serif;font-weight:600;font-size:12px;cursor:pointer;white-space:nowrap}
+#map-stats{position:absolute;top:14px;right:14px;z-index:500;display:flex;flex-direction:column;gap:6px;pointer-events:none}
+.stat-card{background:rgba(19,19,22,0.92);backdrop-filter:blur(12px);border:1px solid var(--edge);border-radius:var(--radius);padding:9px 12px;text-align:right}
+.stat-num{font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:1px;line-height:1}
+.stat-lbl{font-size:9px;font-weight:700;letter-spacing:2px;color:var(--muted);text-transform:uppercase;margin-top:1px}
+#map-toggle{display:none;position:absolute;bottom:20px;left:50%;transform:translateX(-50%);z-index:600;background:var(--fire);color:white;border:none;border-radius:100px;padding:10px 24px;font-family:'Syne',sans-serif;font-weight:700;font-size:13px;cursor:pointer;box-shadow:0 4px 20px rgba(255,59,31,0.4);white-space:nowrap}
+#modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.82);backdrop-filter:blur(4px);z-index:2000;display:none;align-items:center;justify-content:center;padding:16px}
+#modal-overlay.open{display:flex}
+#modal{background:var(--panel);border:1px solid var(--edge);border-radius:20px;padding:32px;max-width:420px;width:100%;animation:modalPop 0.32s cubic-bezier(0.34,1.56,0.64,1);max-height:90vh;overflow-y:auto}
+@keyframes modalPop{from{transform:scale(0.85);opacity:0}to{transform:scale(1);opacity:1}}
+.modal-eyebrow{font-size:10px;font-weight:700;letter-spacing:3px;color:var(--fire);text-transform:uppercase;margin-bottom:8px}
+.modal-title{font-family:'Bebas Neue',sans-serif;font-size:38px;letter-spacing:2px;line-height:1;margin-bottom:8px}
+.modal-sub{font-size:13px;color:var(--soft);line-height:1.6;margin-bottom:20px}
+.modal-perks{display:flex;flex-direction:column;gap:8px;margin-bottom:20px}
+.modal-perk{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--soft)}
+.perk-icon{width:30px;height:30px;background:var(--card);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+.modal-submit{background:linear-gradient(135deg,var(--fire),var(--ember));color:white;border:none;border-radius:var(--radius);padding:13px;font-family:'Syne',sans-serif;font-weight:800;font-size:14px;cursor:pointer;width:100%;margin-top:4px}
+.modal-dismiss{background:none;border:none;color:var(--muted);font-family:'Syne',sans-serif;font-size:13px;cursor:pointer;text-align:center;margin-top:6px;width:100%}
+.blur-address{filter:blur(4px);user-select:none;pointer-events:none;color:var(--soft)}
+.unlock-row{background:rgba(255,59,31,0.1);border:1px solid rgba(255,59,31,0.3);border-radius:8px;padding:8px 12px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.unlock-text{font-size:11px;color:var(--soft);line-height:1.4}
+.unlock-btn{background:var(--fire);color:white;border:none;border-radius:6px;padding:6px 12px;font-family:'Syne',sans-serif;font-weight:700;font-size:11px;cursor:pointer;white-space:nowrap;flex-shrink:0}
+#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--card);border:1px solid var(--edge);border-radius:100px;padding:10px 20px;font-size:13px;font-weight:600;color:var(--text);z-index:3000;transition:transform 0.3s cubic-bezier(0.34,1.56,0.64,1);white-space:nowrap;box-shadow:0 8px 32px rgba(0,0,0,0.5)}
+#toast.show{transform:translateX(-50%) translateY(0)}
+@media(max-width:768px){
+  :root{--header:52px}
+  .header-filters{display:none}
+  .header-search{max-width:none;flex:1}
+  #mobile-bar{display:block}
+  #main{grid-template-columns:1fr;grid-template-rows:1fr;position:relative}
+  #sidebar{position:absolute;top:0;left:0;right:0;bottom:0;z-index:400;transform:translateX(-100%);width:100%;max-width:100%}
+  #sidebar.open{transform:translateX(0)}
+  #map{position:absolute;top:0;left:0;right:0;bottom:0}
+  #map-toggle{display:block}
+  #map-stats{top:10px;right:10px}
+  .stat-card{padding:7px 10px}
+  .stat-num{font-size:20px}
+  .leaflet-popup-content{width:260px!important}
+  #modal{padding:24px}
+  .modal-title{font-size:32px}
+}
+@media(max-width:480px){
+  #header{padding:0 12px;gap:8px}
+  .logo{font-size:18px}
+  .btn-alert-header{padding:6px 10px;font-size:11px}
+  #map-stats{display:none}
+}
+</style>
+</head>
+<body>
+<div id="header">
+  <div class="logo"><div class="logo-pulse"></div><span>CLOSEOUT</span><span style="color:var(--fire)">MAP</span></div>
+  <div class="header-search"><span class="search-icon">🔍</span><input type="text" id="search-input" placeholder="Search city, store, or chain..." oninput="applyFilters()"></div>
+  <div class="header-filters">
+    <div class="chip on" data-filter="all" onclick="setChip(this)">All</div>
+    <div class="chip" data-filter="active" onclick="setChip(this)">🔴 Active Sales</div>
+    <div class="chip" data-filter="upcoming" onclick="setChip(this)">🟡 Upcoming</div>
+    <div class="chip" data-filter="macys" onclick="setChip(this)">Macy's</div>
+    <div class="chip" data-filter="saks" onclick="setChip(this)">Saks</div>
+    <div class="chip" data-filter="jcp" onclick="setChip(this)">JC Penney</div>
+    <div class="chip" data-filter="eddie" onclick="setChip(this)">Eddie Bauer</div>
+    <div class="chip" data-filter="ikea" onclick="setChip(this)">IKEA</div>
+    <div class="chip" data-filter="fran" onclick="setChip(this)">Francesca's</div>
+    <div class="chip" data-filter="vcf" onclick="setChip(this)">Value City</div>
+  </div>
+  <button class="btn-alert-header" onclick="openModal()">🔔 Get Alerts</button>
+</div>
+<div id="mobile-bar">
+  <input type="text" id="mobile-search-input" placeholder="🔍  Search city, store, or chain..." oninput="applyFilters()" style="width:100%;background:var(--card);border:1px solid var(--edge);border-radius:var(--radius);padding:9px 14px;color:var(--text);font-family:'Syne',sans-serif;font-size:14px;outline:none;">
+</div>
+<div id="main">
+  <div id="sidebar">
+    <div class="sidebar-top">
+      <div class="sidebar-count" id="result-count">LOADING...</div>
+      <div class="sidebar-subtitle">Sorted by status — active sales first</div>
+    </div>
+    <div id="store-list"></div>
+  </div>
+  <div id="map"></div>
+  <div id="map-stats">
+    <div class="stat-card"><div class="stat-num" id="stat-active" style="color:var(--fire)">-</div><div class="stat-lbl">Active Sales</div></div>
+    <div class="stat-card"><div class="stat-num" id="stat-upcoming" style="color:var(--gold)">-</div><div class="stat-lbl">Upcoming</div></div>
+    <div class="stat-card"><div class="stat-num" id="stat-states" style="color:var(--jade)">-</div><div class="stat-lbl">States</div></div>
+  </div>
+  <button id="map-toggle" onclick="toggleSidebar()">📋 View List</button>
+</div>
+<div id="modal-overlay" onclick="if(event.target===this)closeModal()">
+  <div id="modal">
+    <div class="modal-eyebrow" style="color:var(--fire);font-size:11px;font-weight:700;letter-spacing:3px;text-transform:uppercase;margin-bottom:8px">⚠️ Happening Right Now</div>
+    <div class="modal-title" style="font-family:'Bebas Neue',sans-serif;font-size:36px;letter-spacing:2px;line-height:1;margin-bottom:12px">A STORE IS CLOSING<br>NEAR YOU RIGHT NOW</div>
+    <div class="modal-sub" style="font-size:13px;color:var(--soft);line-height:1.7;margin-bottom:16px">Don't find out too late.<br>By the time most people hear about a liquidation sale — <strong style="color:var(--text)">the shelves are already empty.</strong></div>
+    <div style="background:rgba(255,59,31,0.08);border:1px solid rgba(255,59,31,0.25);border-radius:10px;padding:12px 14px;margin-bottom:16px;font-size:12px;color:var(--soft);line-height:1.6">
+      🔴 <strong style="color:var(--text)">Right now:</strong> 65 stores closing across the US & Canada<br>
+      📍 <strong style="color:var(--text)">Subscribe free</strong> — enter your zip code<br>
+      ⚡ <strong style="color:var(--text)">We alert you</strong> the moment a store closes in your city
+    </div>
+    <button class="modal-submit" onclick="goToMailchimp()" style="font-size:15px;padding:15px;letter-spacing:1px">🔔 Alert Me Now — It's Free →</button>
+    <button class="modal-dismiss" onclick="closeModal()">No thanks, I'll find out when everyone else does</button>
+  </div>
+</div>
+<div id="toast"></div>
+<script>
+const STORES=[
+  // WALGREENS
+  {chain:"WALGREENS",name:"Walgreens Santa Monica",address:"1450 Ocean Ave, Santa Monica, CA 90401",city:"Santa Monica",state:"CA",discount:70,status:"Active Sale",lat:34.016,lng:-118.496,source:"WARN Act",sourceUrl:"https://edd.ca.gov",note:""},
+  // MACY'S — Sales started mid-Jan 2026, 10-week liquidation = closing late March 2026
+  {chain:"MACY'S",name:"Macy's Corpus Christi",address:"5488 S Padre Island Dr, Corpus Christi, TX 78411",city:"Corpus Christi",state:"TX",discount:70,status:"Active Sale",lat:27.7117,lng:-97.3746,source:"Fast Company",sourceUrl:"https://www.fastcompany.com/91471941/macys-stores-closing",note:"Est. closing: late March 2026. Week 7-8 of liquidation — deep discounts now!"},
+  {chain:"MACY'S",name:"Macy's Newington",address:"50 Fox Run Rd, Newington, NH 03801",city:"Newington",state:"NH",discount:70,status:"Active Sale",lat:43.0975,lng:-70.805,source:"Fast Company",sourceUrl:"https://www.fastcompany.com/91471941/macys-stores-closing",note:"Est. closing: late March 2026. Week 7-8 of liquidation — deep discounts now!"},
+  {chain:"MACY'S",name:"Macy's La Mesa",address:"5500 Grossmont Center Dr, La Mesa, CA 91942",city:"La Mesa",state:"CA",discount:70,status:"Active Sale",lat:32.778,lng:-117.0144,source:"Kiplinger",sourceUrl:"https://www.kiplinger.com/",note:"Est. closing: late March 2026. Week 7-8 of liquidation — deep discounts now!"},
+  {chain:"MACY'S",name:"Macy's Tracy",address:"3400 Naglee Rd, Tracy, CA 95304",city:"Tracy",state:"CA",discount:70,status:"Active Sale",lat:37.7618,lng:-121.4614,source:"Kiplinger",sourceUrl:"https://www.kiplinger.com/",note:"Est. closing: late March 2026. Week 7-8 of liquidation — deep discounts now!"},
+  {chain:"MACY'S",name:"Macy's Atlanta",address:"4880 Briarcliff Rd, Atlanta, GA 30345",city:"Atlanta",state:"GA",discount:70,status:"Active Sale",lat:33.8493,lng:-84.2579,source:"Kiplinger",sourceUrl:"https://www.kiplinger.com/",note:"Est. closing: late March 2026. Week 7-8 of liquidation — deep discounts now!"},
+  {chain:"MACY'S",name:"Macy's Glen Burnie",address:"7900 Ritchie Hwy, Glen Burnie, MD 21061",city:"Glen Burnie",state:"MD",discount:70,status:"Active Sale",lat:39.1392,lng:-76.6106,source:"Fast Company",sourceUrl:"https://www.fastcompany.com/91471941/macys-stores-closing",note:"Est. closing: late March 2026. Week 7-8 of liquidation — deep discounts now!"},
+  {chain:"MACY'S",name:"Macy's Grandville",address:"3850 Rivertown Pkwy SW, Grandville, MI 49418",city:"Grandville",state:"MI",discount:70,status:"Active Sale",lat:42.8799,lng:-85.7614,source:"Fast Company",sourceUrl:"https://www.fastcompany.com/91471941/macys-stores-closing",note:"Est. closing: late March 2026. Week 7-8 of liquidation — deep discounts now!"},
+  {chain:"MACY'S",name:"Macy's St Cloud",address:"4101 W Division St, St Cloud, MN 56301",city:"St Cloud",state:"MN",discount:70,status:"Active Sale",lat:45.5572,lng:-94.2126,source:"Fast Company",sourceUrl:"https://www.fastcompany.com/91471941/macys-stores-closing",note:"Est. closing: late March 2026. Week 7-8 of liquidation — deep discounts now!"},
+  {chain:"MACY'S",name:"Macy's Livingston",address:"112 Eisenhower Pkwy, Livingston, NJ 07039",city:"Livingston",state:"NJ",discount:70,status:"Active Sale",lat:40.7754,lng:-74.3569,source:"Fast Company",sourceUrl:"https://www.fastcompany.com/91471941/macys-stores-closing",note:"Est. closing: late March 2026. Week 7-8 of liquidation — deep discounts now!"},
+  {chain:"MACY'S",name:"Macy's Ramsey",address:"225 Interstate Shopping Center, Ramsey, NJ 07446",city:"Ramsey",state:"NJ",discount:70,status:"Active Sale",lat:41.0693,lng:-74.1419,source:"Fast Company",sourceUrl:"https://www.fastcompany.com/91471941/macys-stores-closing",note:"Est. closing: late March 2026. Week 7-8 of liquidation — deep discounts now!"},
+  {chain:"MACY'S",name:"Macy's Amherst",address:"1255 Niagara Falls Blvd, Amherst, NY 14226",city:"Amherst",state:"NY",discount:70,status:"Active Sale",lat:42.9885,lng:-78.8217,source:"Fast Company",sourceUrl:"https://www.fastcompany.com/91471941/macys-stores-closing",note:"Est. closing: late March 2026. Week 7-8 of liquidation — deep discounts now!"},
+  {chain:"MACY'S",name:"Macy's Raleigh",address:"3801 Sumner Blvd, Raleigh, NC 27616",city:"Raleigh",state:"NC",discount:70,status:"Active Sale",lat:35.8656,lng:-78.5763,source:"Fast Company",sourceUrl:"https://www.fastcompany.com/91471941/macys-stores-closing",note:"Est. closing: late March 2026. Week 7-8 of liquidation — deep discounts now!"},
+  {chain:"MACY'S",name:"Macy's Tarentum",address:"100 Pittsburgh Mills Cir, Tarentum, PA 15084",city:"Tarentum",state:"PA",discount:70,status:"Active Sale",lat:40.5725,lng:-79.8034,source:"Fast Company",sourceUrl:"https://www.fastcompany.com/91471941/macys-stores-closing",note:"Est. closing: late March 2026. Week 7-8 of liquidation — deep discounts now!"},
+  // SAKS FIFTH AVENUE
+  {chain:"SAKS FIFTH AVENUE",name:"Saks Fifth Ave Chicago",address:"700 N Michigan Ave, Chicago, IL 60611",city:"Chicago",state:"IL",discount:30,status:"Active Sale",lat:41.8954,lng:-87.6273,source:"Fast Company",sourceUrl:"https://www.fastcompany.com/91505219/saks-fifth-avenue-closing-stores-full-list-locations-updated",note:"Est. closing: May 2026. Liquidation started Feb 2026 — discounts increasing weekly."},
+  {chain:"SAKS FIFTH AVENUE",name:"Saks Fifth Ave Las Vegas",address:"3200 Las Vegas Blvd S, Las Vegas, NV 89109",city:"Las Vegas",state:"NV",discount:30,status:"Active Sale",lat:36.1275,lng:-115.1741,source:"Las Vegas Sun",sourceUrl:"https://lasvegassun.com/news/2026/mar/09/saks-fifth-avenue-to-close-at-fashion-show-mall/",note:"Est. closing: May 2026. Liquidation started Feb 2026 — discounts increasing weekly."},
+  {chain:"SAKS FIFTH AVENUE",name:"Saks Fifth Ave Huntington Station",address:"230 Walt Whitman Rd, Huntington Station, NY 11746",city:"Huntington Station",state:"NY",discount:10,status:"Upcoming",lat:40.822,lng:-73.4161,source:"Retail Dive",sourceUrl:"https://www.retaildive.com/news/saks-global-15-more-store-closures-expands-vendor-base-500/814159/",note:"Est. closing: May–June 2026. Sale expected to start April 2026."},
+  {chain:"SAKS FIFTH AVENUE",name:"Saks Fifth Ave Chevy Chase",address:"5555 Wisconsin Ave, Chevy Chase, MD 20815",city:"Chevy Chase",state:"MD",discount:10,status:"Upcoming",lat:38.9651,lng:-77.0899,source:"Retail Dive",sourceUrl:"https://www.retaildive.com/news/saks-global-15-more-store-closures-expands-vendor-base-500/814159/",note:"Est. closing: May–June 2026. Sale expected to start April 2026."},
+  {chain:"SAKS FIFTH AVENUE",name:"Saks Fifth Ave Tysons",address:"2051 International Dr, McLean, VA 22102",city:"McLean",state:"VA",discount:10,status:"Upcoming",lat:38.9239,lng:-77.2277,source:"Retail Dive",sourceUrl:"https://www.retaildive.com/news/saks-global-15-more-store-closures-expands-vendor-base-500/814159/",note:"Est. closing: May–June 2026. Sale expected to start April 2026."},
+  {chain:"SAKS FIFTH AVENUE",name:"Saks Fifth Ave Sarasota",address:"120 University Town Center Dr, Sarasota, FL 34243",city:"Sarasota",state:"FL",discount:10,status:"Upcoming",lat:27.3846,lng:-82.4555,source:"Retail Dive",sourceUrl:"https://www.retaildive.com/news/saks-global-15-more-store-closures-expands-vendor-base-500/814159/",note:"Est. closing: May–June 2026. Sale expected to start April 2026."},
+  {chain:"SAKS FIFTH AVENUE",name:"Saks Fifth Ave Raleigh",address:"5959 Triangle Town Blvd, Raleigh, NC 27616",city:"Raleigh",state:"NC",discount:10,status:"Upcoming",lat:35.8663,lng:-78.5787,source:"Retail Dive",sourceUrl:"https://www.retaildive.com/news/saks-global-15-more-store-closures-expands-vendor-base-500/814159/",note:"Est. closing: May–June 2026. Sale expected to start April 2026."},
+  {chain:"SAKS FIFTH AVENUE",name:"Saks Fifth Ave Costa Mesa",address:"3333 Bristol St, Costa Mesa, CA 92626",city:"Costa Mesa",state:"CA",discount:10,status:"Upcoming",lat:33.6927,lng:-117.8909,source:"Retail Dive",sourceUrl:"https://www.retaildive.com/news/saks-global-15-more-store-closures-expands-vendor-base-500/814159/",note:"Est. closing: May–June 2026. Sale expected to start April 2026."},
+  {chain:"SAKS FIFTH AVENUE",name:"Saks Fifth Ave Palm Desert",address:"73555 El Paseo, Palm Desert, CA 92260",city:"Palm Desert",state:"CA",discount:10,status:"Upcoming",lat:33.7187,lng:-116.3842,source:"Retail Dive",sourceUrl:"https://www.retaildive.com/news/saks-global-15-more-store-closures-expands-vendor-base-500/814159/",note:"Est. closing: May–June 2026. Sale expected to start April 2026."},
+  {chain:"SAKS FIFTH AVENUE",name:"Saks Fifth Ave San Antonio",address:"7400 San Pedro Ave, San Antonio, TX 78216",city:"San Antonio",state:"TX",discount:10,status:"Upcoming",lat:29.5189,lng:-98.4981,source:"Retail Dive",sourceUrl:"https://www.retaildive.com/news/saks-global-15-more-store-closures-expands-vendor-base-500/814159/",note:"Est. closing: May–June 2026. Sale expected to start April 2026."},
+  {chain:"SAKS FIFTH AVENUE",name:"Saks Fifth Ave Beachwood",address:"26100 Cedar Rd, Beachwood, OH 44122",city:"Beachwood",state:"OH",discount:10,status:"Upcoming",lat:41.4996,lng:-81.4965,source:"Retail Dive",sourceUrl:"https://www.retaildive.com/news/saks-global-15-more-store-closures-expands-vendor-base-500/814159/",note:"Est. closing: May–June 2026. Sale expected to start April 2026."},
+  {chain:"SAKS FIFTH AVENUE",name:"Saks Fifth Ave St Louis",address:"1 Plaza Frontenac, St Louis, MO 63131",city:"St Louis",state:"MO",discount:10,status:"Upcoming",lat:38.6312,lng:-90.4104,source:"Retail Dive",sourceUrl:"https://www.retaildive.com/news/saks-global-15-more-store-closures-expands-vendor-base-500/814159/",note:"Est. closing: May–June 2026. Sale expected to start April 2026."},
+  // NEIMAN MARCUS
+  {chain:"NEIMAN MARCUS",name:"Neiman Marcus Honolulu",address:"1450 Ala Moana Blvd, Honolulu, HI 96814",city:"Honolulu",state:"HI",discount:10,status:"Upcoming",lat:21.2912,lng:-157.847,source:"Retail Dive",sourceUrl:"https://www.retaildive.com/news/saks-global-15-more-store-closures-expands-vendor-base-500/814159/",note:"Est. closing: May–June 2026. Part of Saks Global bankruptcy restructuring."},
+  {chain:"NEIMAN MARCUS",name:"Neiman Marcus Canoga Park",address:"6600 Topanga Canyon Blvd, Canoga Park, CA 91303",city:"Canoga Park",state:"CA",discount:10,status:"Upcoming",lat:34.1906,lng:-118.608,source:"Retail Dive",sourceUrl:"https://www.retaildive.com/news/saks-global-15-more-store-closures-expands-vendor-base-500/814159/",note:"Est. closing: May–June 2026. Part of Saks Global bankruptcy restructuring."},
+  {chain:"NEIMAN MARCUS",name:"Neiman Marcus White Plains",address:"2 Maple Ave, White Plains, NY 10601",city:"White Plains",state:"NY",discount:10,status:"Upcoming",lat:41.0288,lng:-73.7811,source:"Retail Dive",sourceUrl:"https://www.retaildive.com/news/saks-global-15-more-store-closures-expands-vendor-base-500/814159/",note:"Est. closing: May–June 2026. Part of Saks Global bankruptcy restructuring."},
+  // JC PENNEY
+  {chain:"JC PENNEY",name:"JC Penney Pleasanton",address:"1500 Stoneridge Mall Rd, Pleasanton, CA 94588",city:"Pleasanton",state:"CA",discount:10,status:"Upcoming",lat:37.6946,lng:-121.9289,source:"Pleasanton Weekly",sourceUrl:"https://www.pleasantonweekly.com/business/2025/12/05/jcpenney-closing-store-at-pleasanton-mall-early-next-year",note:"Est. closing: Spring 2026. Announced Dec 2025 — sale expected to start soon."},
+  {chain:"JC PENNEY",name:"JC Penney Sanford",address:"200 Towne Center Cir, Sanford, FL 32771",city:"Sanford",state:"FL",discount:10,status:"Upcoming",lat:28.8006,lng:-81.2707,source:"The Sun",sourceUrl:"https://www.the-sun.com/money/15954984/jcpenney-stoneridge-shopping-center-california-closing/",note:"Est. closing: Spring 2026. Announced late 2025."},
+  {chain:"JC PENNEY",name:"JC Penney Springfield",address:"6500 Springfield Mall, Springfield, VA 22150",city:"Springfield",state:"VA",discount:10,status:"Upcoming",lat:38.7741,lng:-77.1695,source:"The Sun",sourceUrl:"https://www.the-sun.com/money/15918749/jcpenney-springfield-town-center-virginia-closing/",note:"Est. closing: Spring 2026. Announced late 2025."},
+  // DILLARD'S
+  {chain:"DILLARD'S",name:"Dillard's Plano",address:"2501 Dallas Pkwy, Plano, TX 75093",city:"Plano",state:"TX",discount:10,status:"Upcoming",lat:33.0345,lng:-96.832,source:"Community Impact",sourceUrl:"https://communityimpact.com/dallas-fort-worth/plano-north/business/2025/11/11/dillards-to-close-plano-location-at-the-shops-at-willow-bend-in-2026/",note:"Est. closing: Summer 2026. Announced Nov 2025 — sale not yet started."},
+  // IKEA
+  {chain:"IKEA",name:"IKEA Memphis",address:"7900 Ikea Way, Cordova, TN 38016",city:"Cordova",state:"TN",discount:30,status:"Active Sale",lat:35.1495,lng:-89.7876,source:"Daily Memphian",sourceUrl:"https://dailymemphian.com/article/59773/ikea-memphis-to-close-may-2026",note:"CLOSING MAY 3, 2026 — Tennessee only IKEA. Liquidation sale underway now!"},
+  // FRANCESCA'S — ALL 450 STORES CLOSING, LIQUIDATION SALE 25-40% OFF NOW
+  {chain:"FRANCESCA'S",name:"Francesca's Fashion Valley",address:"7007 Friars Rd #583A, San Diego, CA 92108",city:"San Diego",state:"CA",discount:30,status:"Active Sale",lat:32.7685,lng:-117.1604,source:"Fox 5 San Diego",sourceUrl:"https://fox5sandiego.com/news/business/francescas-closing-all-locations-including-those-in-san-diego-county/",note:"ALL Francesca's closing! 25-40% off everything. Filed Chapter 11 Feb 6, 2026."},
+  {chain:"FRANCESCA'S",name:"Francesca's Marlton",address:"500 Route 73 S, Marlton, NJ 08053",city:"Marlton",state:"NJ",discount:30,status:"Active Sale",lat:39.8912,lng:-74.9218,source:"The Sun Papers",sourceUrl:"https://thesunpapers.com/2026/02/10/francescas-closing-stores-for-good/",note:"ALL Francesca's closing! 25-40% off everything. Signs read 'Everything Must Go!'"},
+  {chain:"FRANCESCA'S",name:"Francesca's Cherry Hill",address:"2000 Route 38, Cherry Hill, NJ 08002",city:"Cherry Hill",state:"NJ",discount:30,status:"Active Sale",lat:39.9348,lng:-75.0246,source:"The Sun Papers",sourceUrl:"https://thesunpapers.com/2026/02/10/francescas-closing-stores-for-good/",note:"ALL Francesca's closing! 25-40% off everything. Filed Chapter 11 Feb 6, 2026."},
+  {chain:"FRANCESCA'S",name:"Francesca's Woodfield Mall",address:"5 Woodfield Mall, Schaumburg, IL 60173",city:"Schaumburg",state:"IL",discount:30,status:"Active Sale",lat:42.0409,lng:-88.0787,source:"NBC Chicago",sourceUrl:"https://www.nbcchicago.com/news/local/francescas-boutique-bankruptcy-closing-stores-sales/3890461/",note:"ALL Francesca's closing! 25-40% off everything. Filed Chapter 11 Feb 6, 2026."},
+  {chain:"FRANCESCA'S",name:"Francesca's Southlake Town Square",address:"1431 Plaza Pl, Southlake, TX 76092",city:"Southlake",state:"TX",discount:30,status:"Active Sale",lat:32.9418,lng:-97.1352,source:"Cross Timbers Gazette",sourceUrl:"https://www.crosstimbersgazette.com/2026/02/14/francescas-bankruptcy-filing-prompts-store-closing-sales-at-local-boutiques/",note:"ALL Francesca's closing! 25-40% off everything. Filed Chapter 11 Feb 6, 2026."},
+  {chain:"FRANCESCA'S",name:"Francesca's Princeton MarketFair",address:"3535 US-1, Princeton, NJ 08540",city:"Princeton",state:"NJ",discount:30,status:"Active Sale",lat:40.3128,lng:-74.6690,source:"The Sun Papers",sourceUrl:"https://thesunpapers.com/2026/02/10/francescas-closing-stores-for-good/",note:"ALL Francesca's closing! 25-40% off. Spotted: 20-40% off remaining merchandise."},
+  {chain:"FRANCESCA'S",name:"Francesca's Carlsbad Forum",address:"1923 Calle Barcelona #146, Carlsbad, CA 92009",city:"Carlsbad",state:"CA",discount:30,status:"Active Sale",lat:33.1305,lng:-117.2712,source:"Fox 5 San Diego",sourceUrl:"https://fox5sandiego.com/news/business/francescas-closing-all-locations-including-those-in-san-diego-county/",note:"ALL Francesca's closing! 25-40% off everything. Filed Chapter 11 Feb 6, 2026."},
+  // VALUE CITY FURNITURE — ALL 79 STORES CLOSING, UP TO 50% OFF NOW
+  {chain:"VALUE CITY FURNITURE",name:"Value City Furniture Indianapolis",address:"5450 E 82nd St, Indianapolis, IN 46250",city:"Indianapolis",state:"IN",discount:50,status:"Active Sale",lat:39.9088,lng:-86.0677,source:"Inside Indiana Business",sourceUrl:"https://www.21alivenews.com/2026/01/12/all-value-city-furniture-stores-will-close-part-parent-companys-liquidation/",note:"ALL Value City stores closing! Up to 50% off furniture, mattresses, decor. Shop now before stock runs out!"},
+  {chain:"VALUE CITY FURNITURE",name:"Value City Furniture Greenwood",address:"1218 US-31 N, Greenwood, IN 46142",city:"Greenwood",state:"IN",discount:50,status:"Active Sale",lat:39.6372,lng:-86.1052,source:"Inside Indiana Business",sourceUrl:"https://www.21alivenews.com/2026/01/12/all-value-city-furniture-stores-will-close-part-parent-companys-liquidation/",note:"ALL Value City stores closing! Up to 50% off furniture, mattresses, decor. Shop now before stock runs out!"},
+  {chain:"VALUE CITY FURNITURE",name:"Value City Furniture Columbus",address:"3900 Morse Rd, Columbus, OH 43219",city:"Columbus",state:"OH",discount:50,status:"Active Sale",lat:40.0721,lng:-82.9313,source:"Retail Dive",sourceUrl:"https://www.retaildive.com/news/value-city-american-signature-furniture-close-89-stores/809331/",note:"ALL Value City stores closing! Up to 50% off furniture, mattresses, decor. Filed bankruptcy Nov 2025."},
+  {chain:"VALUE CITY FURNITURE",name:"Value City Furniture Pittsburgh",address:"500 Mall Blvd, Monroeville, PA 15146",city:"Monroeville",state:"PA",discount:50,status:"Active Sale",lat:40.4275,lng:-79.7849,source:"Retail Dive",sourceUrl:"https://www.retaildive.com/news/value-city-american-signature-furniture-close-89-stores/809331/",note:"ALL Value City stores closing! Up to 50% off furniture, mattresses, decor. Filed bankruptcy Nov 2025."},
+  {chain:"VALUE CITY FURNITURE",name:"Value City Furniture Baltimore",address:"6600 Baltimore National Pike, Catonsville, MD 21228",city:"Catonsville",state:"MD",discount:50,status:"Active Sale",lat:39.2776,lng:-76.7421,source:"Retail Dive",sourceUrl:"https://www.retaildive.com/news/value-city-american-signature-furniture-close-89-stores/809331/",note:"ALL Value City stores closing! Up to 50% off furniture, mattresses, decor. Filed bankruptcy Nov 2025."},
+  {chain:"VALUE CITY FURNITURE",name:"Value City Furniture Detroit",address:"14055 Lakeside Circle, Sterling Heights, MI 48313",city:"Sterling Heights",state:"MI",discount:50,status:"Active Sale",lat:42.6064,lng:-83.0302,source:"Retail Dive",sourceUrl:"https://www.retaildive.com/news/value-city-american-signature-furniture-close-89-stores/809331/",note:"ALL Value City stores closing! Up to 50% off furniture, mattresses, decor. Filed bankruptcy Nov 2025."},
+  // AMERICAN SIGNATURE FURNITURE — ALL 10 STORES CLOSING
+  {chain:"AMERICAN SIGNATURE",name:"American Signature Jacksonville Regency",address:"9501 Arlington Expy, Jacksonville, FL 32225",city:"Jacksonville",state:"FL",discount:50,status:"Active Sale",lat:30.3322,lng:-81.5457,source:"Jax Daily Record",sourceUrl:"https://www.jaxdailyrecord.com/news/2026/jan/27/american-signature-furniture-closing-out-in-regency-argyle/",note:"CLOSING 2026 — All American Signature stores liquidating. Up to 50% off furniture now!"},
+  {chain:"AMERICAN SIGNATURE",name:"American Signature Jacksonville Argyle",address:"6600 Youngerman Circle, Jacksonville, FL 32244",city:"Jacksonville",state:"FL",discount:50,status:"Active Sale",lat:30.2057,lng:-81.7318,source:"Jax Daily Record",sourceUrl:"https://www.jaxdailyrecord.com/news/2026/jan/27/american-signature-furniture-closing-out-in-regency-argyle/",note:"CLOSING 2026 — All American Signature stores liquidating. Up to 50% off furniture now!"},
+  {chain:"AMERICAN SIGNATURE",name:"American Signature Wilmington",address:"5501 Kirkwood Hwy, Wilmington, DE 19808",city:"Wilmington",state:"DE",discount:50,status:"Active Sale",lat:39.7318,lng:-75.6721,source:"TheStreet",sourceUrl:"https://www.thestreet.com/retail/78-year-old-furniture-chain-american-signature-shuts-all-stores-in-bankruptcy",note:"CLOSING 2026 — All American Signature stores liquidating. Up to 50% off furniture now!"},
+    // EDDIE BAUER CANADA — ALL 31 STORES CLOSING, 60%+ OFF NOW
+  {chain:"EDDIE BAUER 🇨🇦",name:"Eddie Bauer West Vancouver",address:"2002 Park Royal S, West Vancouver, BC V7T 2W4",city:"West Vancouver",state:"BC",discount:60,status:"Active Sale",lat:49.3269,lng:-123.1537,source:"Retail Insider",sourceUrl:"https://retail-insider.com/retail-insider/2026/02/eddie-bauer-poised-to-exit-canada-as-store-shutdown-looms/",note:"ALL Canadian Eddie Bauer stores closing! 60%+ off now. Closing Spring 2026."},
+  {chain:"EDDIE BAUER 🇨🇦",name:"Eddie Bauer Victoria",address:"638 Mayfair Shopping Centre, Victoria, BC V8Z 6E3",city:"Victoria",state:"BC",discount:60,status:"Active Sale",lat:48.4570,lng:-123.3701,source:"Retail Insider",sourceUrl:"https://retail-insider.com/retail-insider/2026/02/eddie-bauer-poised-to-exit-canada-as-store-shutdown-looms/",note:"ALL Canadian Eddie Bauer stores closing! 60%+ off now. Closing Spring 2026."},
+  {chain:"EDDIE BAUER 🇨🇦",name:"Eddie Bauer Tsawwassen",address:"5000 Canoe Pass Way Unit 130, Tsawwassen, BC V4M 0B3",city:"Tsawwassen",state:"BC",discount:60,status:"Active Sale",lat:49.0175,lng:-123.0768,source:"Retail Insider",sourceUrl:"https://retail-insider.com/retail-insider/2026/02/eddie-bauer-poised-to-exit-canada-as-store-shutdown-looms/",note:"ALL Canadian Eddie Bauer stores closing! 60%+ off now. Closing Spring 2026."},
+  {chain:"EDDIE BAUER 🇨🇦",name:"Eddie Bauer Nanaimo",address:"6631 Island Hwy N, Nanaimo, BC V9T 4T7",city:"Nanaimo",state:"BC",discount:60,status:"Active Sale",lat:49.2142,lng:-124.0186,source:"Nanaimo News NOW",sourceUrl:"https://nanaimonewsnow.com/2026/02/09/nanaimo-eddie-bauer-store-closing-by-spring-as-company-battles-financial-struggles/",note:"ALL Canadian Eddie Bauer stores closing! 60%+ off now. Closing Spring 2026."},
+  {chain:"EDDIE BAUER 🇨🇦",name:"Eddie Bauer Toronto Don Mills",address:"32 Karl Fraser Rd, Toronto, ON M3C 0E8",city:"Toronto",state:"ON",discount:60,status:"Active Sale",lat:43.7240,lng:-79.3398,source:"Global News",sourceUrl:"https://globalnews.ca/news/11659984/eddie-bauer-bankruptcy/",note:"ALL Canadian Eddie Bauer stores closing! 60%+ off now. Closing Spring 2026."},
+  {chain:"EDDIE BAUER 🇨🇦",name:"Eddie Bauer Vaughan Mills",address:"1 Bass Pro Dr Suite 713, Vaughan, ON L4K 5W4",city:"Vaughan",state:"ON",discount:60,status:"Active Sale",lat:43.8271,lng:-79.5377,source:"Global News",sourceUrl:"https://globalnews.ca/news/11659984/eddie-bauer-bankruptcy/",note:"ALL Canadian Eddie Bauer stores closing! 60%+ off now. Closing Spring 2026."},
+  {chain:"EDDIE BAUER 🇨🇦",name:"Eddie Bauer Ottawa Place d'Orleans",address:"110 Place d'Orleans Dr, Ottawa, ON K1C 2L9",city:"Ottawa",state:"ON",discount:60,status:"Active Sale",lat:45.4773,lng:-75.5245,source:"Global News",sourceUrl:"https://globalnews.ca/news/11659984/eddie-bauer-bankruptcy/",note:"ALL Canadian Eddie Bauer stores closing! 60%+ off now. Closing Spring 2026."},
+  {chain:"EDDIE BAUER 🇨🇦",name:"Eddie Bauer Hamilton",address:"999 Upper Wentworth St Unit 411, Hamilton, ON L9A 4X5",city:"Hamilton",state:"ON",discount:60,status:"Active Sale",lat:43.2205,lng:-79.8720,source:"Global News",sourceUrl:"https://globalnews.ca/news/11659984/eddie-bauer-bankruptcy/",note:"ALL Canadian Eddie Bauer stores closing! 60%+ off now. Closing Spring 2026."},
+  {chain:"EDDIE BAUER 🇨🇦",name:"Eddie Bauer Newmarket",address:"17600 Yonge St Unit DD16, Newmarket, ON L3Y 4Z1",city:"Newmarket",state:"ON",discount:60,status:"Active Sale",lat:44.0476,lng:-79.4683,source:"Global News",sourceUrl:"https://globalnews.ca/news/11659984/eddie-bauer-bankruptcy/",note:"ALL Canadian Eddie Bauer stores closing! 60%+ off now. Closing Spring 2026."},
+  {chain:"EDDIE BAUER 🇨🇦",name:"Eddie Bauer Dartmouth",address:"21 Mic Mac Blvd, Dartmouth, NS B3A 4N3",city:"Dartmouth",state:"NS",discount:60,status:"Active Sale",lat:44.6820,lng:-63.5709,source:"Retail Insider",sourceUrl:"https://retail-insider.com/retail-insider/2026/02/eddie-bauer-poised-to-exit-canada-as-store-shutdown-looms/",note:"ALL Canadian Eddie Bauer stores closing! 60%+ off now. Closing Spring 2026."},
+    // EDDIE BAUER USA — ALL STORES CLOSING APRIL 30, 2026
+  {chain:"EDDIE BAUER",name:"Eddie Bauer Ann Arbor",address:"3055 Ann Arbor-Saline Rd, Ann Arbor, MI 48103",city:"Ann Arbor",state:"MI",discount:50,status:"Active Sale",lat:42.2459,lng:-83.7932,source:"Business Insider",sourceUrl:"https://finance.yahoo.com/news/more-300-stores-set-close-101001922.html",note:"CLOSING APRIL 30, 2026. All Eddie Bauer US stores closing — shop now!"},
+  {chain:"EDDIE BAUER",name:"Eddie Bauer Annapolis",address:"2002 Annapolis Mall, Annapolis, MD 21401",city:"Annapolis",state:"MD",discount:50,status:"Active Sale",lat:38.9896,lng:-76.5436,source:"Business Insider",sourceUrl:"https://finance.yahoo.com/news/more-300-stores-set-close-101001922.html",note:"CLOSING APRIL 30, 2026. All Eddie Bauer US stores closing — shop now!"},
+  {chain:"EDDIE BAUER",name:"Eddie Bauer Portland",address:"340 SW Morrison St, Portland, OR 97204",city:"Portland",state:"OR",discount:50,status:"Active Sale",lat:45.5202,lng:-122.6742,source:"Business Insider",sourceUrl:"https://finance.yahoo.com/news/more-300-stores-set-close-101001922.html",note:"CLOSING APRIL 30, 2026. All Eddie Bauer US stores closing — shop now!"},
+  {chain:"EDDIE BAUER",name:"Eddie Bauer Pittsburgh",address:"1000 Ross Park Mall Dr, Pittsburgh, PA 15237",city:"Pittsburgh",state:"PA",discount:50,status:"Active Sale",lat:40.5372,lng:-80.0077,source:"Business Insider",sourceUrl:"https://finance.yahoo.com/news/more-300-stores-set-close-101001922.html",note:"CLOSING APRIL 30, 2026. All Eddie Bauer US stores closing — shop now!"},
+  {chain:"EDDIE BAUER",name:"Eddie Bauer Greenwood Village",address:"8555 E Arapahoe Rd, Greenwood Village, CO 80112",city:"Greenwood Village",state:"CO",discount:50,status:"Active Sale",lat:39.6133,lng:-104.8708,source:"Business Insider",sourceUrl:"https://finance.yahoo.com/news/more-300-stores-set-close-101001922.html",note:"CLOSING APRIL 30, 2026. All Eddie Bauer US stores closing — shop now!"},
+];
+
+const TIMELINE=[{week:"Wk 1–2",pct:10,width:10},{week:"Wk 3–4",pct:30,width:30},{week:"Wk 5–6",pct:50,width:50},{week:"Wk 7–8",pct:70,width:70},{week:"Final",pct:90,width:90}];
+function discColor(n){if(n>=70)return'#FF3B1F';if(n>=40)return'#FF6B35';if(n>=20)return'#FFB020';return'#22C55E'}
+function getWeekIndex(d){if(d>=90)return 4;if(d>=70)return 3;if(d>=50)return 2;if(d>=30)return 1;return 0;}
+function makeTimelineHTML(discount){const cur=getWeekIndex(discount);return`<div class="timeline-section"><div class="timeline-title">📉 Discount Timeline</div>${TIMELINE.map((t,i)=>{const isHere=i===cur&&discount>0;const isPast=i<cur;const fill=isHere?discColor(t.pct):isPast?'#444':'#2A2A32';return`<div class="timeline-row"><div class="timeline-week" style="color:${isHere?'var(--text)':'var(--muted)'}">${t.week}</div><div class="timeline-bar-wrap"><div class="timeline-bar-fill" style="width:${t.width}%;background:${fill}"></div></div><div class="timeline-pct" style="color:${isHere?discColor(t.pct):'var(--muted)'}">${t.pct}%</div>${isHere?'<div class="timeline-here">NOW</div>':''}</div>`;}).join('')}</div>`;}
+let map,markers={},activeFilter='all',sidebarOpen=false;
+function initMap(){map=L.map('map',{center:[38,-96],zoom:4,zoomControl:true,attributionControl:false});L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(map);L.control.attribution({prefix:'© OpenStreetMap | CloseoutMap'}).addTo(map);}
+function makeIcon(s){const color=discColor(s.discount);return L.divIcon({html:`<div class="cm-marker"><div class="cm-pin" style="background:${color}"><span class="cm-pin-text">${s.discount}%</span></div><div class="cm-shadow"></div></div>`,className:'',iconSize:[42,52],iconAnchor:[21,52],popupAnchor:[0,-52]});}
+function makePopup(s){const color=discColor(s.discount);const noteHtml=s.note?`<div class="popup-note"><div class="popup-note-label">📌 Note</div>${s.note}</div>`:'';const addrHtml=`<div class="unlock-row"><div class="unlock-text">🔒 <strong style="color:var(--text)">Subscribers only</strong><br>Sign up free to get the exact address + directions</div><button class="unlock-btn" onclick="openModal()">Unlock Free →</button></div><div class="blur-address">123 Hidden St, ${s.city} •••••</div>`;return`<div class="popup-inner"><div class="popup-chain">${s.chain}</div><div class="popup-header"><div><div class="popup-name">${s.name}</div></div><div class="popup-disc" style="color:${color};font-size:${s.status==="Upcoming"?"22px":"34px"}">${s.status==="Upcoming"?"COMING SOON":s.discount+"%"}</div></div><div class="popup-grid"><div class="popup-cell"><div class="popup-cell-label">Location</div><div class="popup-cell-val">${s.city}, ${s.state}</div></div><div class="popup-cell"><div class="popup-cell-label">Status</div><div class="popup-cell-val" style="color:${s.status==='Active Sale'?'#FF3B1F':'#FFB020'}">${s.status==='Active Sale'?'🔴 Active':'🟡 Upcoming'}</div></div><div class="popup-cell"><div class="popup-cell-label">Discount</div><div class="popup-cell-val" style="color:${color}">${s.status==="Upcoming"?"Sale not started":""+s.discount+"% Off"}</div></div><div class="popup-cell"><div class="popup-cell-label">Source</div><div class="popup-cell-val">${s.source}</div></div></div>${noteHtml}${addrHtml}${makeTimelineHTML(s.discount)}<div class="popup-actions"><button class="popup-btn-src" onclick="window.open('${s.sourceUrl}','_blank')">📋 Source</button><button class="popup-btn-dir" onclick="openModal()">📍 Get Address →</button></div></div>`;}
+function renderMarkers(stores){Object.values(markers).forEach(m=>map.removeLayer(m));markers={};stores.forEach(s=>{if(!s.lat||!s.lng)return;const m=L.marker([s.lat,s.lng],{icon:makeIcon(s)}).bindPopup(makePopup(s),{maxWidth:320,className:''}).addTo(map);markers[s.name]=m;});}
+function renderList(stores){const el=document.getElementById('store-list');document.getElementById('result-count').textContent=`${stores.length} CLOSURE${stores.length!==1?'S':''} FOUND`;if(!stores.length){el.innerHTML=`<div class="empty-state" style="text-align:center;padding:40px 20px;color:var(--muted)"><div style="font-size:32px;margin-bottom:8px">🗺️</div><div style="font-weight:700;font-size:14px;color:var(--soft)">No results found</div></div>`;return;}el.innerHTML=stores.map((s,i)=>{const color=discColor(s.discount);const noteHtml=s.note?`<div class="scard-note">📌 ${s.note}</div>`:'';return`<div class="scard" style="animation-delay:${i*0.03}s" onclick="focusStore('${s.name.replace(/'/g,"\\'")}')"><div class="scard-top"><div><div class="scard-name">${s.name}</div><div class="scard-loc">${s.city}, ${s.state}</div></div><div class="disc" style="color:${color};font-size:${s.status==="Upcoming"?"16px":"24px"}">${s.status==="Upcoming"?"SOON":s.discount+"%"}</div></div><div class="scard-meta"><span class="status-pip" style="background:${s.status==='Active Sale'?'#FF3B1F':'#FFB020'}"></span><span>${s.status}</span><span>·</span><span>${s.chain}</span></div>${noteHtml}</div>`;}).join('');}
+function updateStats(stores){document.getElementById('stat-active').textContent=stores.filter(s=>s.status==='Active Sale').length;document.getElementById('stat-upcoming').textContent=stores.filter(s=>s.status==='Upcoming').length;document.getElementById('stat-states').textContent=new Set(stores.map(s=>s.state)).size;}
+function focusStore(name){const m=markers[name];if(!m)return;if(window.innerWidth<=768){closeSidebar();}map.flyTo(m.getLatLng(),13,{duration:0.8});setTimeout(()=>m.openPopup(),850);}
+function getQuery(){const d=document.getElementById('search-input').value.trim().toLowerCase();const m=document.getElementById('mobile-search-input');return d||(m?m.value.trim().toLowerCase():'');}
+function applyFilters(){const q=getQuery();const filtered=STORES.filter(s=>{const mf=activeFilter==='all'?true:activeFilter==='active'?s.status==='Active Sale':activeFilter==='upcoming'?s.status==='Upcoming':activeFilter==='macys'?s.chain.includes("MACY"):activeFilter==='saks'?s.chain.includes("SAKS"):activeFilter==='jcp'?s.chain.includes("PENNEY"):activeFilter==='eddie'?s.chain.includes("EDDIE"):activeFilter==='ikea'?s.chain.includes("IKEA"):activeFilter==='fran'?s.chain.includes("FRANCESCA"):activeFilter==='vcf'?s.chain.includes("VALUE CITY")||s.chain.includes("AMERICAN SIG"):true;const ms=!q||s.name.toLowerCase().includes(q)||s.city.toLowerCase().includes(q)||s.state.toLowerCase().includes(q)||s.chain.toLowerCase().includes(q);return mf&&ms;});filtered.sort((a,b)=>{if(a.status==='Active Sale'&&b.status!=='Active Sale')return -1;if(b.status==='Active Sale'&&a.status!=='Active Sale')return 1;return b.discount-a.discount;});renderList(filtered);renderMarkers(filtered);updateStats(filtered);}
+function setChip(el){activeFilter=el.dataset.filter;document.querySelectorAll('.chip').forEach(c=>c.classList.remove('on'));el.classList.add('on');applyFilters();}
+function toggleSidebar(){sidebarOpen=!sidebarOpen;const sb=document.getElementById('sidebar');const btn=document.getElementById('map-toggle');if(sidebarOpen){sb.classList.add('open');btn.textContent='🗺️ View Map';}else{sb.classList.remove('open');btn.textContent='📋 View List';}}
+function closeSidebar(){sidebarOpen=false;document.getElementById('sidebar').classList.remove('open');document.getElementById('map-toggle').textContent='📋 View List';}
+function goToMailchimp(){window.open('http://eepurl.com/jBsV-c','_blank');closeModal();}
+function openModal(){document.getElementById('modal-overlay').classList.add('open')}
+function closeModal(){document.getElementById('modal-overlay').classList.remove('open');}
+document.addEventListener('DOMContentLoaded',()=>{initMap();applyFilters();});
+</script>
+</body>
+</html>
