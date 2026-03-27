@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CloseoutMap Admin</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0d0d14; color: white; font-family: Arial, sans-serif; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+  .container { width: 100%; max-width: 500px; padding: 20px; }
+  .logo { color: #FF3B1F; font-size: 28px; font-weight: bold; text-align: center; margin-bottom: 8px; }
+  .subtitle { color: #666; text-align: center; margin-bottom: 30px; font-size: 14px; }
+  .card { background: #1a1a2e; border-radius: 12px; padding: 30px; border: 1px solid #333; }
+  .card h2 { color: white; margin-bottom: 20px; font-size: 18px; }
+  label { display: block; color: #aaa; font-size: 13px; margin-bottom: 6px; margin-top: 16px; }
+  input, select { width: 100%; padding: 12px; background: #0d0d14; border: 1px solid #333; border-radius: 8px; color: white; font-size: 15px; outline: none; }
+  input:focus { border-color: #FF3B1F; }
+  .btn { width: 100%; padding: 14px; background: #FF3B1F; color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 24px; }
+  .btn:hover { background: #e02d10; }
+  .btn:disabled { background: #555; cursor: not-allowed; }
+  .result { margin-top: 20px; padding: 15px; border-radius: 8px; font-size: 14px; display: none; }
+  .result.success { background: #0a2a0a; border: 1px solid #2a7a2a; color: #4CAF50; }
+  .result.error { background: #2a0a0a; border: 1px solid #7a2a2a; color: #f44336; }
+  .login-card { background: #1a1a2e; border-radius: 12px; padding: 30px; border: 1px solid #333; }
+  .login-card h2 { color: white; margin-bottom: 20px; text-align: center; }
+  .divider { border: none; border-top: 1px solid #333; margin: 20px 0; }
+  .section-title { color: #FF3B1F; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; margin-top: 24px; margin-bottom: 4px; }
+  .city-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+  .city-btn { padding: 8px; background: #0d0d14; border: 1px solid #333; border-radius: 6px; color: #ccc; font-size: 13px; cursor: pointer; text-align: center; }
+  .city-btn:hover { border-color: #FF3B1F; color: white; }
+  .subscribers-count { color: #666; font-size: 12px; margin-top: 20px; text-align: center; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <div class="logo">CloseoutMap 🗺️</div>
+  <div class="subtitle">Admin Panel</div>
+
+  <!-- LOGIN SCREEN -->
+  <div class="login-card" id="loginScreen">
+    <h2>🔐 Enter Password</h2>
+    <label>Password</label>
+    <input type="password" id="passwordInput" placeholder="Enter admin password" onkeydown="if(event.key==='Enter') login()">
+    <button class="btn" onclick="login()">Login</button>
+    <div class="result" id="loginError">❌ Incorrect password</div>
+  </div>
+
+  <!-- ADMIN SCREEN -->
+  <div id="adminScreen" style="display:none;">
+    <div class="card">
+      <h2>🚨 Send City Alert</h2>
+      <p style="color:#666;font-size:13px;">Send a store closing alert to all subscribers in a city.</p>
+
+      <div class="section-title">Quick City Select</div>
+      <div class="city-grid">
+        <div class="city-btn" onclick="setCity('Los Angeles')">Los Angeles</div>
+        <div class="city-btn" onclick="setCity('Aventura')">Aventura</div>
+        <div class="city-btn" onclick="setCity('Montreal')">Montreal</div>
+        <div class="city-btn" onclick="setCity('New York')">New York</div>
+      </div>
+
+      <label>Store Name *</label>
+      <input type="text" id="storeName" placeholder="e.g. Kirkland's">
+
+      <label>City *</label>
+      <input type="text" id="cityName" placeholder="e.g. Los Angeles">
+
+      <label>Address</label>
+      <input type="text" id="address" placeholder="e.g. 123 Main St, Los Angeles CA">
+
+      <label>Closing Date</label>
+      <input type="text" id="closingDate" placeholder="e.g. April 30, 2026">
+
+      <button class="btn" id="sendBtn" onclick="sendAlert()">📧 Send Alert</button>
+
+      <div class="result" id="alertResult"></div>
+    </div>
+
+    <hr class="divider" style="margin-top:20px;">
+
+    <div style="text-align:center;">
+      <button onclick="logout()" style="background:none;border:none;color:#666;font-size:13px;cursor:pointer;">Logout</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const PASSWORD = 'Freedom2026!';
+  const SUPABASE_URL = 'https://ezbmsveydjfxedzswiqr.supabase.co';
+  const SUPABASE_ANON_KEY = 'sb_publishable_yfyoLVOUlCcu3e6uCeba8g_JWH_gIA_';
+
+  // Check if already logged in
+  if (sessionStorage.getItem('cm_admin') === 'true') {
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('adminScreen').style.display = 'block';
+  }
+
+  function login() {
+    const pwd = document.getElementById('passwordInput').value;
+    if (pwd === PASSWORD) {
+      sessionStorage.setItem('cm_admin', 'true');
+      document.getElementById('loginScreen').style.display = 'none';
+      document.getElementById('adminScreen').style.display = 'block';
+    } else {
+      const err = document.getElementById('loginError');
+      err.style.display = 'block';
+    }
+  }
+
+  function logout() {
+    sessionStorage.removeItem('cm_admin');
+    document.getElementById('loginScreen').style.display = 'block';
+    document.getElementById('adminScreen').style.display = 'none';
+    document.getElementById('passwordInput').value = '';
+  }
+
+  function setCity(city) {
+    document.getElementById('cityName').value = city;
+  }
+
+  async function sendAlert() {
+    const storeName = document.getElementById('storeName').value.trim();
+    const city = document.getElementById('cityName').value.trim();
+    const address = document.getElementById('address').value.trim();
+    const closingDate = document.getElementById('closingDate').value.trim();
+    const resultDiv = document.getElementById('alertResult');
+    const btn = document.getElementById('sendBtn');
+
+    if (!storeName || !city) {
+      resultDiv.className = 'result error';
+      resultDiv.style.display = 'block';
+      resultDiv.textContent = '❌ Store name and city are required!';
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = '⏳ Sending...';
+    resultDiv.style.display = 'none';
+
+    try {
+      const response = await fetch(`${SUPABASE_URL}/functions/v1/city-alert`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+        },
+        body: JSON.stringify({ store_name: storeName, city, address, closing_date: closingDate })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        resultDiv.className = 'result success';
+        resultDiv.style.display = 'block';
+        resultDiv.textContent = `✅ Success! Sent ${data.sent} alerts out of ${data.total} subscribers in ${city}.`;
+        // Clear form
+        document.getElementById('storeName').value = '';
+        document.getElementById('address').value = '';
+        document.getElementById('closingDate').value = '';
+      } else {
+        throw new Error(data.error || 'Unknown error');
+      }
+    } catch(e) {
+      resultDiv.className = 'result error';
+      resultDiv.style.display = 'block';
+      resultDiv.textContent = '❌ Error: ' + e.message;
+    }
+
+    btn.disabled = false;
+    btn.textContent = '📧 Send Alert';
+  }
+</script>
+
+</body>
+</html>
